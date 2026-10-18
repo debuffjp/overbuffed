@@ -6,6 +6,7 @@ import { ENEMIES, type EnemyName } from "../content/enemies";
 import { C } from "../palette";
 import { boil } from "../systems/boil";
 import { Grid } from "../systems/grid";
+import type { BoilText } from "../systems/text";
 
 export interface RunDeps {
   game: Game;
@@ -14,6 +15,7 @@ export interface RunDeps {
   tweens: Tweens;
   particles: Particles;
   frames: (name: string) => readonly Frame[];
+  text: BoilText;
 }
 
 interface Enemy { id: number; kind: EnemyName; x: number; y: number; hp: number; flash: number; dead: boolean }
@@ -22,7 +24,7 @@ interface Gem { x: number; y: number; xp: number; taken: boolean }
 
 const PLAYER_R = 6;
 
-export function createRun({ game, input, audio, tweens, particles, frames }: RunDeps): Scene {
+export function createRun({ game, input, audio, tweens, particles, frames, text }: RunDeps): Scene {
   const tune = game.params.define("player", {
     speed: { type: "number", default: 80, min: 0, max: 300, units: "px/s" },
     accel: { type: "number", default: 900, min: 0, max: 5000, units: "px/s²" },
@@ -231,12 +233,15 @@ export function createRun({ game, input, audio, tweens, particles, frames }: Run
       for (let i = 0; i < tune.values.hp; i++) draw.rect(4 + i * 7, 4, 5, 5, i < player.hp ? C.buff : C.slate);
       draw.rect(4, 12, 80, 3, C.deep);
       draw.rect(4, 12, Math.round(80 * (xp / xpToLevel(level))), 3, C.buff);
-      draw.text(`LV ${level}`, 88, 10, { color: C.text });
+      text.draw(draw, `LV ${level}`, 88, 10, { color: C.text, baseline: "middle" }, 1);
       const s = Math.floor(time);
-      draw.text(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`, game.width - 28, 4, { color: C.text });
+      text.draw(draw, `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`, game.width - 4, 4, { color: C.text, align: "right" }, 2);
       if (over) {
-        draw.text("OVERWHELMED", game.width / 2 - 40, 76, { color: C.rose });
-        draw.text(`${kills} critters - press space`, game.width / 2 - 70, 92, { color: C.text });
+        draw.rect(game.width / 2 - 64, 66, 128, 52, C.ink);
+        draw.rect(game.width / 2 - 62, 68, 124, 48, C.deep);
+        text.draw(draw, "OVERWHELMED", game.width / 2, 74, { color: C.rose, align: "center" });
+        text.draw(draw, `${kills} critters popped`, game.width / 2, 90, { color: C.text, align: "center" }, 1);
+        text.draw(draw, "press space", game.width / 2, 102, { color: C.cyan, align: "center" }, 2);
       }
     },
 

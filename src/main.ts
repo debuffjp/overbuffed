@@ -6,6 +6,7 @@ import { Input } from "@debuffjp/input";
 import { Particles, Tweens } from "@debuffjp/juice";
 import { C } from "./palette";
 import { createRun } from "./scenes/run";
+import { BoilText } from "./systems/text";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error('Missing <canvas id="game">');
@@ -27,7 +28,7 @@ const particles = new Particles(() => game.random.next());
 const assets = new Assets(await (await fetch("assets/manifest.json")).json());
 await assets.load();
 
-game.add(createRun({ game, input, audio, tweens, particles, frames: (name) => assets.frames(name) })).go("run");
+game.add(createRun({ game, input, audio, tweens, particles, frames: (name) => assets.frames(name), text: new BoilText(game, assets.frames("font")) })).go("run");
 game.start();
 
 // Dev-only: window.__DEBUFF_DEV__ for scenarios and agents, and the overlay (toggle with `).

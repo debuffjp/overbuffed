@@ -29,3 +29,5 @@
 - Draw in Aseprite (via an Aseprite MCP server, configured per machine). Sources go in `art/*.aseprite`.
   Exported sheets go to `assets/` as `name@WxH.png`, frames left to right: boil 0, 1, 2, then action frames.
 - 320×180, integer scale. Buff (lime, gap-cut eyes, squash and stretch) is the hero.
+- Text: **buffont**, our own pixel font (`art/font.lua` → `assets/font@6x11.png`, 5×7 caps, proportional).
+  It boils by hopping each glyph a pixel up or down per frame; glyph shapes never change, so text stays legible.
