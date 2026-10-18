@@ -1,69 +1,139 @@
--- Generates Overbuffed's first-pass sprites: flat silhouettes, 1px ink contour gaps, 3 boil frames.
+-- Overbuffed's sprites: hand-drawn pixel grids, boiled Baba Is You style, exported by Aseprite.
 -- Run: Aseprite.exe -b --script art/sprites.lua   (from the repo root)
--- Each sprite is a list of shapes. A pixel takes the topmost shape that covers it; where two shapes
--- meet, the lower one leaves a 1px gap so the ink ground shows through. "hole" shapes cut gaps (eyes).
+--
+-- Each sprite is drawn below as rows of text: "#" is the sprite's one flat colour, "." is empty. Gaps
+-- inside a shape (eyes, mouths, seams between lobes) are just "." too: the ink ground shows through.
+-- Every frame of the boil is the same drawing with its outer edge nibbled and sprouted a pixel here and
+-- there, so the outline wobbles while eyes and seams stay put.
 
 local function hex(h)
-  return app.pixelColor.rgba(tonumber(h:sub(2,3),16), tonumber(h:sub(4,5),16), tonumber(h:sub(6,7),16), 255)
+  return app.pixelColor.rgba(tonumber(h:sub(2, 3), 16), tonumber(h:sub(4, 5), 16), tonumber(h:sub(6, 7), 16), 255)
 end
 local C = { buff = hex("#cffb2d"), shot = hex("#f4ffd0"), rose = hex("#ff5d73"), amber = hex("#ff9f43"), violet = hex("#b06cff"), cyan = hex("#5ee6ff") }
 
--- Small deterministic noise so each boil frame wobbles differently but the output never changes.
+-- Small deterministic noise, so the output never changes between runs.
 local seed = 1
 local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
-local function j(amount) return (rnd() * 2 - 1) * amount end
 
-local function inside(s, x, y)
-  local px, py = x + 0.5, y + 0.5
-  if s.kind == "circle" then
-    return (px - s.x)^2 + (py - s.y)^2 <= s.r^2
-  elseif s.kind == "poly" then -- points = { x1, y1, x2, y2, ... }
-    local p, n, inside = s.points, #s.points // 2, false
-    local j = n
-    for i = 1, n do
-      local xi, yi, xj, yj = p[i * 2 - 1], p[i * 2], p[j * 2 - 1], p[j * 2]
-      if (yi > py) ~= (yj > py) and px < (xj - xi) * (py - yi) / (yj - yi) + xi then inside = not inside end
-      j = i
-    end
-    return inside
-  elseif s.kind == "rrect" then -- rounded rect: x,y,w,h,r
-    local cx = math.max(s.x + s.r, math.min(px, s.x + s.w - s.r))
-    local cy = math.max(s.y + s.r, math.min(py, s.y + s.h - s.r))
-    return px >= s.x and px <= s.x + s.w and py >= s.y and py <= s.y + s.h and (px - cx)^2 + (py - cy)^2 <= s.r^2
-  end
-end
+local SPRITES = {
+  -- buff: a soft lime block with tall eyes, a small mouth and two stubby feet.
+  { name = "buff", color = C.buff, wobble = 0.22, rows = {
+    "................",
+    "....########....",
+    "..############..",
+    ".##############.",
+    ".##############.",
+    ".###..####..###.",
+    ".###..####..###.",
+    ".###..####..###.",
+    ".##############.",
+    ".######..######.",
+    ".##############.",
+    "..############..",
+    "...##########...",
+    "...###....###...",
+    "...###....###...",
+    "................",
+  } },
+  -- blob: a rose critter, two ear-lobes over a round body, split by a seam.
+  { name = "blob", color = C.rose, wobble = 0.22, rows = {
+    ".###....###.",
+    "#####..#####",
+    ".###....###.",
+    "............",
+    "..########..",
+    ".##########.",
+    ".##.####.##.",
+    ".##.####.##.",
+    ".##########.",
+    ".##########.",
+    "..########..",
+    "............",
+  } },
+  -- spiker: an amber thistle, three thorns over a round body.
+  { name = "spiker", color = C.amber, wobble = 0.2, rows = {
+    "#....#....#.",
+    "##...#...##.",
+    ".##.###.##..",
+    "..#######...",
+    "............",
+    "..#######...",
+    ".#########..",
+    ".##.###.##..",
+    ".##.###.##..",
+    ".#########..",
+    "..#######...",
+    "............",
+  } },
+  -- brute: a big violet elite, two lumps for a head over a body with a wide open grin and feet.
+  { name = "brute", color = C.violet, wobble = 0.25, rows = {
+    "...#####....#####...",
+    "..#######..#######..",
+    ".########..########.",
+    ".########..########.",
+    "..######....######..",
+    "....................",
+    "..################..",
+    ".##################.",
+    ".####..######..####.",
+    ".####..######..####.",
+    ".##################.",
+    ".##################.",
+    ".####..........####.",
+    ".#####........#####.",
+    ".##################.",
+    "..################..",
+    "...##############...",
+    "...####......####...",
+    "...####......####...",
+    "....................",
+  } },
+  -- petal: buff's orbiting weapon, a lime leaf split down its midrib.
+  { name = "petal", color = C.buff, wobble = 0.12, rows = {
+    "........",
+    "..##.##.",
+    ".###.###",
+    "####.###",
+    "####.###",
+    ".###.###",
+    "..##.##.",
+    "........",
+  } },
+  -- gem (XP): a lime crystal with one facet line.
+  { name = "gem", color = C.buff, wobble = 0.08, rows = {
+    "..##..",
+    ".####.",
+    "##.###",
+    "###.##",
+    ".####.",
+    "..##..",
+  } },
+  -- dew: a cyan heal droplet with a highlight gap.
+  { name = "dew", color = C.cyan, wobble = 0.08, rows = {
+    "...#...",
+    "..###..",
+    "..###..",
+    ".#####.",
+    "##.####",
+    "#######",
+    ".#####.",
+    "..###..",
+  } },
+  -- shot: a pale seed.
+  { name = "shot", color = C.shot, wobble = 0.1, rows = {
+    ".###.",
+    "#####",
+    "#####",
+    "#####",
+    ".###.",
+  } },
+}
 
-local function render(img, w, h, shapes, color)
-  local owner = {}
-  for y = 0, h - 1 do for x = 0, w - 1 do
-    local o = 0
-    for i, s in ipairs(shapes) do if inside(s, x, y) then o = i end end
-    owner[y * w + x] = o
-  end end
-  for y = 0, h - 1 do for x = 0, w - 1 do
-    local o = owner[y * w + x]
-    if o > 0 and not shapes[o].hole then
-      local gap = false
-      for _, d in ipairs({ {1,0}, {-1,0}, {0,1}, {0,-1} }) do
-        local nx, ny = x + d[1], y + d[2]
-        if nx >= 0 and ny >= 0 and nx < w and ny < h then
-          local n = owner[ny * w + nx]
-          if n > o and not shapes[n].hole and not shapes[n].merge then gap = true end
-        end
-      end
-      if not gap then img:drawPixel(x, y, shapes[o].color or color) end
-    end
-  end end
-end
-
--- Baba Is You-style boil: after drawing, nibble and sprout single pixels along the silhouette edge,
--- so every frame looks freshly redrawn rather than shifted.
-local function wobble(img, w, h)
+-- Nibble and sprout single pixels on the outer edge only: empty pixels reachable from the border count as
+-- "outside", so eye holes and seams never change.
+local function wobble(img, w, h, amount)
   local function filled(x, y) return x >= 0 and y >= 0 and x < w and y < h and app.pixelColor.rgbaA(img:getPixel(x, y)) > 0 end
-  -- Only the outer edge wobbles; eye cuts and contour gaps stay crisp. "outside" = empty pixels
-  -- reachable from the border.
-  local outside = {}
-  local stack = {}
+  local outside, stack = {}, {}
   for x = 0, w - 1 do stack[#stack + 1] = { x, 0 }; stack[#stack + 1] = { x, h - 1 } end
   for y = 0, h - 1 do stack[#stack + 1] = { 0, y }; stack[#stack + 1] = { w - 1, y } end
   while #stack > 0 do
@@ -78,20 +148,21 @@ local function wobble(img, w, h)
   local function out(x, y) return x < 0 or y < 0 or x >= w or y >= h or outside[y * w + x] end
   local nib, sprout = {}, {}
   for y = 0, h - 1 do for x = 0, w - 1 do
-    local n = 0
-    local col
-    for _, d in ipairs({ {1,0}, {-1,0}, {0,1}, {0,-1} }) do
+    local n, col = 0, nil
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
       if filled(x + d[1], y + d[2]) then n = n + 1; col = img:getPixel(x + d[1], y + d[2]) end
     end
     if filled(x, y) then
-      local touchesOutside = out(x + 1, y) or out(x - 1, y) or out(x, y + 1) or out(x, y - 1)
-      local onlyOutside = true
-      for _, d in ipairs({ {1,0}, {-1,0}, {0,1}, {0,-1} }) do
+      -- Only pixels whose empty neighbours are all outside: never eat into an eye or seam.
+      local edge, safe = false, true
+      for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
         local nx, ny = x + d[1], y + d[2]
-        if not filled(nx, ny) and not out(nx, ny) then onlyOutside = false end
+        if not filled(nx, ny) then
+          if out(nx, ny) then edge = true else safe = false end
+        end
       end
-      if touchesOutside and onlyOutside and n <= 2 and rnd() < 0.3 then nib[#nib + 1] = { x, y } end
-    elseif outside[y * w + x] and n >= 2 and rnd() < 0.25 then
+      if edge and safe and n <= 2 and rnd() < amount * 1.3 then nib[#nib + 1] = { x, y } end
+    elseif outside[y * w + x] and n >= 2 and rnd() < amount then
       sprout[#sprout + 1] = { x, y, col }
     end
   end end
@@ -99,94 +170,22 @@ local function wobble(img, w, h)
   for _, p in ipairs(sprout) do img:drawPixel(p[1], p[2], p[3]) end
 end
 
-local function make(name, w, h, frames, color, build)
+for si, s in ipairs(SPRITES) do
+  local h, w = #s.rows, #s.rows[1]
+  for _, row in ipairs(s.rows) do assert(#row == w, s.name .. ": rows must all be " .. w .. " wide") end
   local spr = Sprite(w, h, ColorMode.RGB)
-  for f = 1, frames - 1 do spr:newEmptyFrame() end
-  for f = 1, frames do
-    seed = f * 7919 + #name
+  spr:newEmptyFrame(); spr:newEmptyFrame()
+  for f = 1, 3 do
+    seed = si * 7919 + f * 104729
     local img = Image(w, h, ColorMode.RGB)
-    render(img, w, h, build(f), color)
-    if w >= 12 then wobble(img, w, h) end
+    for y, row in ipairs(s.rows) do
+      for x = 1, w do if row:sub(x, x) == "#" then img:drawPixel(x - 1, y - 1, s.color) end end
+    end
+    wobble(img, w, h, s.wobble)
     spr:newCel(spr.layers[1], f, img, Point(0, 0))
   end
   for _, fr in ipairs(spr.frames) do fr.duration = 0.125 end -- ~8 fps boil
-  spr:saveAs("art/" .. name .. ".aseprite")
-  app.command.ExportSpriteSheet { ui = false, type = SpriteSheetType.HORIZONTAL, textureFilename = "assets/" .. name .. "@" .. w .. "x" .. h .. ".png" }
+  spr:saveAs("art/" .. s.name .. ".aseprite")
+  app.command.ExportSpriteSheet { ui = false, type = SpriteSheetType.HORIZONTAL, textureFilename = "assets/" .. s.name .. "@" .. w .. "x" .. h .. ".png" }
   spr:close()
 end
-
--- buff: a soft lime block hugging itself, with gap-cut eyes and a little arm across its front.
-make("buff", 16, 16, 3, C.buff, function()
-  return {
-    { kind = "rrect", x = 1.5 + j(0.6), y = 2 + j(0.6), w = 13 + j(0.6), h = 13 + j(0.5), r = 4 + j(1.0) },
-    { kind = "rrect", x = 4 + j(0.8), y = 10.2 + j(0.6), w = 9 + j(0.8), h = 3.2, r = 1.6 }, -- arm
-    { kind = "rrect", x = 4.6 + j(0.5), y = 5 + j(0.5), w = 2, h = 3.2, r = 1, hole = true },
-    { kind = "rrect", x = 9.4 + j(0.5), y = 5 + j(0.5), w = 2, h = 3.2, r = 1, hole = true },
-  }
-end)
-
--- blob: a rose petal-cluster of three locked circles, two eye cuts on the front one.
-make("blob", 12, 12, 3, C.rose, function()
-  return {
-    { kind = "circle", x = 3.6 + j(0.6), y = 4 + j(0.6), r = 3.2 + j(0.5) },
-    { kind = "circle", x = 8.4 + j(0.6), y = 4 + j(0.6), r = 3.2 + j(0.5) },
-    { kind = "circle", x = 6 + j(0.5), y = 7.4 + j(0.6), r = 4.2 + j(0.5) },
-    { kind = "rrect", x = 3.8 + j(0.5), y = 6.4, w = 1.6, h = 2.2, r = 0.8, hole = true },
-    { kind = "rrect", x = 6.8 + j(0.5), y = 6.4, w = 1.6, h = 2.2, r = 0.8, hole = true },
-  }
-end)
-
--- gem (XP): a small lime pebble split by one gap.
-make("gem", 6, 6, 3, C.buff, function()
-  return {
-    { kind = "circle", x = 2.4 + j(0.5), y = 3 + j(0.5), r = 2.2 + j(0.3) },
-    { kind = "circle", x = 3.8 + j(0.5), y = 3 + j(0.5), r = 2 + j(0.3) },
-  }
-end)
-
--- shot: a pale seed.
-make("shot", 5, 5, 3, C.shot, function()
-  return { { kind = "circle", x = 2.5 + j(0.5), y = 2.5 + j(0.5), r = 2 + j(0.5) } }
-end)
-
--- spiker: a fast amber thistle, three thorns crowning a round body. Reads as "sharp" next to the round blobs.
-make("spiker", 12, 12, 3, C.amber, function()
-  return {
-    { kind = "poly", points = { 1 + j(0.4), 0.5 + j(0.5), 5 + j(0.3), 6, 2 + j(0.3), 7 } },
-    { kind = "poly", points = { 6 + j(0.4), 0 + j(0.4), 8 + j(0.3), 6, 4 + j(0.3), 6 } },
-    { kind = "poly", points = { 11 + j(0.4), 0.5 + j(0.5), 10 + j(0.3), 7, 7 + j(0.3), 6 } },
-    { kind = "circle", x = 6 + j(0.4), y = 8 + j(0.4), r = 3.6 + j(0.3) },
-    { kind = "rrect", x = 4 + j(0.3), y = 7.4, w = 1.4, h = 2, r = 0.7, hole = true },
-    { kind = "rrect", x = 6.8 + j(0.3), y = 7.4, w = 1.4, h = 2, r = 0.7, hole = true },
-  }
-end)
-
--- brute: a big violet elite, a lumpy mass of four locked lobes with a wide gap-cut grin.
-make("brute", 20, 20, 3, C.violet, function()
-  return {
-    { kind = "circle", x = 6 + j(0.7), y = 7 + j(0.7), r = 5.4 + j(0.5) },
-    { kind = "circle", x = 14 + j(0.7), y = 7 + j(0.7), r = 5.4 + j(0.5) },
-    { kind = "circle", x = 5.5 + j(0.7), y = 14 + j(0.6), r = 5 + j(0.5) },
-    { kind = "circle", x = 14.5 + j(0.7), y = 14 + j(0.6), r = 5 + j(0.5) },
-    { kind = "circle", x = 10 + j(0.5), y = 11 + j(0.5), r = 6.5 + j(0.4) },
-    { kind = "rrect", x = 6.5 + j(0.4), y = 8.5 + j(0.3), w = 2.2, h = 3, r = 1, hole = true },
-    { kind = "rrect", x = 11.3 + j(0.4), y = 8.5 + j(0.3), w = 2.2, h = 3, r = 1, hole = true },
-    { kind = "rrect", x = 6 + j(0.5), y = 13.5 + j(0.4), w = 8, h = 1.4, r = 0.7, hole = true },
-  }
-end)
-
--- petal: buff's orbiting weapon, a lime leaf split down the middle.
-make("petal", 8, 8, 3, C.buff, function()
-  return {
-    { kind = "circle", x = 3.2 + j(0.4), y = 4 + j(0.4), r = 3 + j(0.3) },
-    { kind = "circle", x = 4.8 + j(0.4), y = 4 + j(0.4), r = 3 + j(0.3) },
-  }
-end)
-
--- dew: a cyan heal pickup, a droplet.
-make("dew", 7, 8, 3, C.cyan, function()
-  return {
-    { kind = "poly", points = { 3.5 + j(0.3), 0.3, 6 + j(0.3), 5, 1 + j(0.3), 5 } },
-    { kind = "circle", x = 3.5 + j(0.3), y = 5.2 + j(0.3), r = 2.6 + j(0.2) },
-  }
-end)
