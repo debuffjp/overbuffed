@@ -1,79 +1,34 @@
+import { Assets } from "@debuffjp/assets";
 import { Audio } from "@debuffjp/audio";
-import { approach, clamp, Game, lerp, type Scene, Storage } from "@debuffjp/core";
+import { Game } from "@debuffjp/core";
 import { devOverlay, devTools } from "@debuffjp/dev";
 import { Input } from "@debuffjp/input";
-import { Particles, squash, Tweens } from "@debuffjp/juice";
+import { Particles, Tweens } from "@debuffjp/juice";
+import { C } from "./palette";
+import { createRun } from "./scenes/run";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error('Missing <canvas id="game">');
 
-const game = new Game({ canvas, width: 320, height: 180, background: "#11140d" });
+const game = new Game({ canvas, width: 320, height: 180, pixelArt: true, scale: "integer", background: C.ink });
 const input = new Input(game, {
   bindings: {
     left: ["ArrowLeft", "KeyA", "PadLeft", "PadStickLeft"],
     right: ["ArrowRight", "KeyD", "PadRight", "PadStickRight"],
-    pop: ["Space", "PadA", "Pointer"],
+    up: ["ArrowUp", "KeyW", "PadUp", "PadStickUp"],
+    down: ["ArrowDown", "KeyS", "PadDown", "PadStickDown"],
+    confirm: ["Space", "Enter", "PadA"],
   },
 });
 const audio = new Audio();
 const tweens = new Tweens();
 const particles = new Particles(() => game.random.next());
-const save = new Storage("my-game", { pops: 0 });
 
-// Creative parameters: typed, ranged and live-tunable.
-// Try in the console: __DEBUFF_DEV__.setParam("player", "speed", 300)
-const tuning = game.params.define("player", {
-  speed: { type: "number", default: 140, min: 0, max: 600, units: "px/s" },
-  accel: { type: "number", default: 1200, min: 0, max: 5000, units: "px/s²" },
-});
+const assets = new Assets(await (await fetch("assets/manifest.json")).json());
+await assets.load();
 
-// prevX is where buff was a step ago: render blends toward x so motion stays smooth on fast displays.
-const player = { x: 160, prevX: 160, y: 120, vx: 0, scaleX: 1, scaleY: 1 };
-
-const play: Scene = {
-  id: "play",
-
-  update(dt) {
-    player.prevX = player.x;
-    let dir = input.axis("left", "right");
-    if (input.pointer.down) dir = Math.sign(input.pointer.x - player.x);
-    player.vx = approach(player.vx, dir * tuning.values.speed, tuning.values.accel * dt);
-    player.x = clamp(player.x + player.vx * dt, 8, game.width - 8);
-
-    if (input.pressed("pop")) {
-      save.set("pops", save.get("pops") + 1);
-      squash(tweens, player, 0.35);
-      particles.emit({ x: player.x, y: player.y - 8, count: 16, colors: ["#cffb2d", "#f3fecb"], gravity: 200 });
-      game.camera.shake(0.3);
-      audio.synth({ freq: 660, freqEnd: 220, decay: 0.15 });
-    }
-    tweens.update(dt);
-    particles.update(dt);
-  },
-
-  render(draw, alpha) {
-    draw.withCamera(game.camera, () => {
-      // buff, the debuff mascot: a lime block with eyes, squashing from its feet.
-      draw.push();
-      draw.translate(lerp(player.prevX, player.x, alpha), player.y);
-      draw.scale(player.scaleX, player.scaleY);
-      draw.rect(-8, -16, 16, 16, "#cffb2d");
-      draw.rect(-5, -12, 3, 4, "#11140d");
-      draw.rect(2, -12, 3, 4, "#11140d");
-      draw.pop();
-      particles.draw(draw);
-    });
-  },
-
-  // Snapshot for scenarios and agents (dev only).
-  inspect() {
-    return { player: { x: Math.round(player.x), vx: Math.round(player.vx) }, pops: save.get("pops"), particles: particles.count };
-  },
-};
-
-game.add(play).go("play");
+game.add(createRun({ game, input, audio, tweens, particles, frames: (name) => assets.frames(name) })).go("run");
 game.start();
 
-// Dev-only plugins: window.__DEBUFF_DEV__ for scenarios and agents, and an overlay (toggle with `) with
-// a frame-time graph and live sliders for every param. Both are stripped from production builds.
+// Dev-only: window.__DEBUFF_DEV__ for scenarios and agents, and the overlay (toggle with `).
 if (import.meta.env.DEV) game.use(devTools({ input })).use(devOverlay());
