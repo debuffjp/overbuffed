@@ -41,7 +41,7 @@ interface Shot { x: number; y: number; px: number; py: number; vx: number; vy: n
 interface Gem { x: number; y: number; xp: number; dew: boolean; taken: boolean }
 type Phase = "play" | "choose" | "over" | "won";
 
-const PLAYER_R = 6;
+const PLAYER_R = 8;
 
 export function createRun({ game, input, audio, tweens, particles, frames, text, save }: RunDeps) {
   const tune = game.params.define("player", {
@@ -56,8 +56,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     rate: { type: "number", default: 0.6, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
     ramp: { type: "number", default: 0.012, min: 0, max: 2, units: "enemies/s²", description: "Spawn rate gained per second survived" },
     max: { type: "number", default: 400, min: 1, max: 2000 },
-    surge: { type: "number", default: 0.00004, min: 0, max: 0.001, units: "enemies/s³", description: "Spawn rate gained per second², so the back half of a run gets crowded" },
-    toughen: { type: "number", default: 0.12, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
+    surge: { type: "number", default: 0.00007, min: 0, max: 0.001, units: "enemies/s³", description: "Spawn rate gained per second², so the back half of a run gets crowded" },
+    toughen: { type: "number", default: 0.2, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
   });
   const run = game.params.define("run", {
     length: { type: "number", default: 600, min: 10, max: 1800, units: "s", description: "Survive this long to win" },
@@ -226,7 +226,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     const petals = lv("petals");
     if (petals > 0) {
       petalAngle += dt * 3;
-      const radius = 18 + petals * 3;
+      const radius = 24 + petals * 3;
       for (let i = 0; i < petals; i++) {
         const a = petalAngle + (i / petals) * Math.PI * 2;
         const px = player.x + Math.cos(a) * radius, py = player.y + Math.sin(a) * radius;
@@ -244,11 +244,11 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     pulseCd -= dt;
     pulseFx = Math.max(0, pulseFx - dt);
     if (pulse > 0 && pulseCd <= 0) {
-      pulseCd = 3 * 0.85 ** (pulse - 1) * haste();
+      pulseCd = 3.5 * 0.85 ** (pulse - 1) * haste();
       pulseFx = 0.3;
       const radius = pulseRadius();
       grid.near(player.x, player.y, radius, (e) => {
-        if ((e.x - player.x) ** 2 + (e.y - player.y) ** 2 <= radius * radius) hit(e, 3 * might(), 160);
+        if ((e.x - player.x) ** 2 + (e.y - player.y) ** 2 <= radius * radius) hit(e, 3 * might(), 100);
       });
       audio.synth({ freq: 180, freqEnd: 90, decay: 0.25 });
       game.emit("pulse");
@@ -362,7 +362,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
       if (enemies.length < swarm.values.max) spawn(pickKind());
     }
     if (time >= nextElite) {
-      nextElite += ELITES.every;
+      // Elites come more often as the run goes on, so a maxed build that stands still still gets tested.
+      nextElite += Math.max(20, ELITES.every - time / 12);
       spawn("brute");
     }
     const damp = Math.exp(-8 * dt);
@@ -372,7 +373,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
       const k = ENEMIES[e.kind];
       const ex = player.x - e.x, ey = player.y - e.y, d = Math.hypot(ex, ey) || 1;
       // Pressed against buff, a critter stops pushing in: the swarm rings buff instead of burying it.
-      const chase = d > PLAYER_R + k.size / 2 ? k.speed : 0;
+      // They stop just inside touching range, so contact still lands.
+      const chase = d > PLAYER_R + k.size / 2 - 3 ? k.speed : 0;
       e.x += ((ex / d) * chase + e.kx) * dt;
       e.y += ((ey / d) * chase + e.ky) * dt;
       e.kx *= damp;
@@ -488,19 +490,19 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     }
     for (const s of shots) {
       const x = s.px + (s.x - s.px) * alpha, y = s.py + (s.y - s.py) * alpha;
-      draw.sprite(sprite("shot", s.x * 0.1), Math.round(x - 2.5), Math.round(y - 2.5));
+      draw.sprite(sprite("shot", s.x * 0.1), Math.round(x - 3), Math.round(y - 3));
     }
     const petals = lv("petals");
     for (let i = 0; i < petals; i++) {
-      const a = petalAngle + (i / petals) * Math.PI * 2, r = 18 + petals * 3;
-      draw.sprite(sprite("petal", i), Math.round(px + Math.cos(a) * r - 4), Math.round(py + Math.sin(a) * r - 4));
+      const a = petalAngle + (i / petals) * Math.PI * 2, r = 24 + petals * 3;
+      draw.sprite(sprite("petal", i), Math.round(px + Math.cos(a) * r - 5), Math.round(py + Math.sin(a) * r - 5));
     }
 
     if (phase !== "over" && (player.hurt === 0 || Math.floor(player.hurt * 12) % 2 === 0)) {
       draw.push();
-      draw.translate(Math.round(px), Math.round(py) + 8);
+      draw.translate(Math.round(px), Math.round(py) + 11);
       draw.scale(player.scaleX * player.faceX, player.scaleY);
-      draw.sprite(sprite("buff"), -8, -16);
+      draw.sprite(sprite("buff"), -11, -22);
       draw.pop();
     }
     particles.draw(draw);

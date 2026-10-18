@@ -51,7 +51,7 @@ export function createTitle({ game, input, text, frames, save }: TitleDeps): Sce
       }
 
       const bob = Math.round(Math.sin(t * 4) * 2);
-      draw.sprite(buff[boil(game)]!, game.width / 2 - 8, 82 + bob);
+      draw.sprite(buff[boil(game)]!, game.width / 2 - 11, 78 + bob);
       text.draw(draw, "survive the swarm", game.width / 2, 106, { color: C.text, align: "center" }, 1);
       if (Math.floor(t * 2) % 2 === 0) text.draw(draw, "press space", game.width / 2, 122, { color: C.cyan, align: "center" }, 2);
       const best = save.get("best");
