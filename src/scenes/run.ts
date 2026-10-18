@@ -390,9 +390,11 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
         const min = (ENEMIES[e.kind].size + ENEMIES[o.kind].size) * 0.45;
         const ox = e.x - o.x, oy = e.y - o.y, d2 = ox * ox + oy * oy;
         if (d2 > 0 && d2 < min * min) {
-          const d = Math.sqrt(d2), push = Math.min(min - d, (min - d) * 16 * dt) * ENEMIES[e.kind].weight;
-          e.x += (ox / d) * push;
-          e.y += (oy / d) * push;
+          // Into the damped knockback velocity, not the position: a packed crowd settles instead of jittering
+          // (position nudges made dense swarms shimmer fast enough to fail the photosensitivity check).
+          const d = Math.sqrt(d2), push = (min - d) * 30 * dt * ENEMIES[e.kind].weight;
+          e.kx += (ox / d) * push;
+          e.ky += (oy / d) * push;
         }
       });
 
