@@ -17,6 +17,8 @@
 - Enemy families differ by silhouette as well as colour.
 
 ## Boil
+- Feel: Baba Is You. Chunky silhouettes whose outer edge nibbles and sprouts single pixels each frame;
+  eyes and contour gaps stay crisp. `art/sprites.lua` generates the first pass in Aseprite.
 - Every sprite, tile, UI frame and glyph has **3 hand-redrawn frames** looping at ~8 fps (line boil).
   What boils is mostly the contour gaps and silhouette edges, so the whole screen wobbles like a flipbook.
 - Redraw each frame by nudging the gaps and edges by 1px. Never just shift the whole sprite.
