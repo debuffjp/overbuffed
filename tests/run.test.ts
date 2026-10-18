@@ -39,7 +39,7 @@ describe("title", () => {
     game.tap("Space").wait(2);
     expect(game.scene).toBe("run");
     expect(game.state.phase).toBe("play");
-    expect(game.state.player).toEqual({ x: 0, y: 0, hp: 6, maxHp: 6 });
+    expect(game.state.player).toEqual({ x: 0, y: 0, hp: 10, maxHp: 10 });
     expect(game.state.levels).toEqual({ seeds: 1 });
   });
 });

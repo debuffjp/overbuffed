@@ -47,13 +47,14 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   const tune = game.params.define("player", {
     speed: { type: "number", default: 80, min: 0, max: 300, units: "px/s" },
     accel: { type: "number", default: 900, min: 0, max: 5000, units: "px/s²" },
-    hp: { type: "number", default: 6, min: 1, max: 50 },
-    iframes: { type: "number", default: 1, min: 0, max: 3, units: "s", description: "Invulnerable time after a hit" },
-    magnet: { type: "number", default: 28, min: 0, max: 200, units: "px", description: "XP gems fly to buff inside this range" },
+    hp: { type: "number", default: 10, min: 1, max: 50 },
+    iframes: { type: "number", default: 0.9, min: 0, max: 3, units: "s", description: "Invulnerable time after a hit" },
+    magnet: { type: "number", default: 40, min: 0, max: 200, units: "px", description: "XP gems fly to buff inside this range" },
+    pop: { type: "number", default: 36, min: 0, max: 120, units: "px", description: "When hit, buff shoves critters within this range away" },
   });
   const swarm = game.params.define("swarm", {
-    rate: { type: "number", default: 0.7, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
-    ramp: { type: "number", default: 0.03, min: 0, max: 2, units: "enemies/s²", description: "Spawn rate gained per second survived" },
+    rate: { type: "number", default: 0.6, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
+    ramp: { type: "number", default: 0.012, min: 0, max: 2, units: "enemies/s²", description: "Spawn rate gained per second survived" },
     max: { type: "number", default: 400, min: 1, max: 2000 },
     toughen: { type: "number", default: 0.12, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
   });
@@ -150,7 +151,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   function hit(e: Enemy, damage: number, push = 0, fromX = player.x, fromY = player.y) {
     if (e.dead) return;
     e.hp -= damage;
-    e.flash = 1;
+    if (damage) e.flash = 1;
     if (push) {
       const dx = e.x - fromX, dy = e.y - fromY, d = Math.hypot(dx, dy) || 1;
       const k = push * ENEMIES[e.kind].weight;
@@ -194,7 +195,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     if (seeds > 0 && reload <= 0) {
       const target = nearestEnemy(170);
       if (target) {
-        reload = (haste() / 3) * 0.75 ** Math.floor(seeds / 2);
+        reload = (haste() / 3.5) * 0.75 ** Math.floor(seeds / 2);
         const count = 1 + Math.floor((seeds - 1) / 2);
         const base = Math.atan2(target.y - player.y, target.x - player.x);
         for (let i = 0; i < count; i++) {
@@ -402,6 +403,11 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
         if (e.dead || (e.x - player.x) ** 2 + (e.y - player.y) ** 2 > r * r) return;
         player.hp -= ENEMIES[e.kind].damage;
         player.hurt = tune.values.iframes;
+        // buff pops when hit, shoving the crowd back so there's room to escape instead of a death spiral.
+        grid.near(player.x, player.y, tune.values.pop, (o) => {
+          if ((o.x - player.x) ** 2 + (o.y - player.y) ** 2 <= tune.values.pop ** 2) hit(o, 0, 260);
+        });
+        particles.emit({ x: player.x, y: player.y, count: 14, colors: [C.buff], speed: [60, 140], gravity: 0 });
         squash(tweens, player, 0.4);
         game.camera.shake(0.35);
         audio.synth({ freq: 200, freqEnd: 60, decay: 0.2 });
