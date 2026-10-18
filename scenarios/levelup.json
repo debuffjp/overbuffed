@@ -7,9 +7,9 @@
     { "command": "levels", "args": [1] },
     { "wait": 2 },
     { "expect": { "state.phase": { "eq": "choose" } } },
+    { "wait": 30 },
     { "capture": "cards" },
     { "contrast": [16, 52, 96, 70] },
-    { "wait": 30 },
     { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
     { "wait": 2 },
     { "expect": { "state.phase": { "eq": "play" } } }
