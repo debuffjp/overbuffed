@@ -56,7 +56,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     rate: { type: "number", default: 0.6, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
     ramp: { type: "number", default: 0.012, min: 0, max: 2, units: "enemies/sÂ²", description: "Spawn rate gained per second survived" },
     max: { type: "number", default: 400, min: 1, max: 2000 },
-    surge: { type: "number", default: 0.00004, min: 0, max: 0.001, units: "enemies/s³", description: "Spawn rate gained per second², so the back half of a run gets crowded" },
+    surge: { type: "number", default: 0.00004, min: 0, max: 0.001, units: "enemies/sÂ³", description: "Spawn rate gained per secondÂ², so the back half of a run gets crowded" },
     toughen: { type: "number", default: 0.12, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
   });
   const run = game.params.define("run", {
