@@ -27,6 +27,9 @@ interface Enemy {
   kind: EnemyName;
   x: number;
   y: number;
+  /** Position a step ago, for drawing between steps. */
+  px: number;
+  py: number;
   hp: number;
   kx: number;
   ky: number;
@@ -34,7 +37,7 @@ interface Enemy {
   petalCd: number;
   dead: boolean;
 }
-interface Shot { x: number; y: number; vx: number; vy: number; life: number; damage: number }
+interface Shot { x: number; y: number; px: number; py: number; vx: number; vy: number; life: number; damage: number }
 interface Gem { x: number; y: number; xp: number; dew: boolean; taken: boolean }
 type Phase = "play" | "choose" | "over" | "won";
 
@@ -44,15 +47,15 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   const tune = game.params.define("player", {
     speed: { type: "number", default: 80, min: 0, max: 300, units: "px/s" },
     accel: { type: "number", default: 900, min: 0, max: 5000, units: "px/s²" },
-    hp: { type: "number", default: 5, min: 1, max: 50 },
-    iframes: { type: "number", default: 0.8, min: 0, max: 3, units: "s", description: "Invulnerable time after a hit" },
+    hp: { type: "number", default: 6, min: 1, max: 50 },
+    iframes: { type: "number", default: 1, min: 0, max: 3, units: "s", description: "Invulnerable time after a hit" },
     magnet: { type: "number", default: 28, min: 0, max: 200, units: "px", description: "XP gems fly to buff inside this range" },
   });
   const swarm = game.params.define("swarm", {
-    rate: { type: "number", default: 1.2, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
-    ramp: { type: "number", default: 0.06, min: 0, max: 2, units: "enemies/s²", description: "Spawn rate gained per second survived" },
+    rate: { type: "number", default: 0.7, min: 0, max: 60, units: "enemies/s", description: "Spawn rate at the start" },
+    ramp: { type: "number", default: 0.03, min: 0, max: 2, units: "enemies/s²", description: "Spawn rate gained per second survived" },
     max: { type: "number", default: 400, min: 1, max: 2000 },
-    toughen: { type: "number", default: 0.25, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
+    toughen: { type: "number", default: 0.12, min: 0, max: 2, description: "Extra enemy health per minute, as a fraction" },
   });
   const run = game.params.define("run", {
     length: { type: "number", default: 600, min: 10, max: 1800, units: "s", description: "Survive this long to win" },
@@ -92,7 +95,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   const might = () => 1 + 0.25 * lv("might");
   const haste = () => 0.88 ** lv("haste");
   const maxHp = () => tune.values.hp + lv("heart");
-  const xpToLevel = (l: number) => 4 + l * 4 + Math.floor(l * l * 0.3);
+  const xpToLevel = (l: number) => 3 + l * 3 + Math.floor(l * l * 0.25);
 
   function reset() {
     Object.assign(player, { x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0, hurt: 0 });
@@ -116,6 +119,9 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     kills = 0;
     xp = 0;
     level = 1;
+    // Locked to buff, so buff and the world round to the same pixel every frame (no 1px shimmy).
+    game.camera.lerp = 0;
+    game.camera.deadzone = { x: 0, y: 0 };
     game.camera.follow(player, true);
   }
 
@@ -126,7 +132,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     const a = game.random.range(0, Math.PI * 2);
     const d = Math.hypot(game.width, game.height) / 2 + 16;
     const hp = ENEMIES[kind].hp * (1 + (swarm.values.toughen * time) / 60);
-    enemies.push({ id: nextId++, kind, x: player.x + Math.cos(a) * d, y: player.y + Math.sin(a) * d, hp, kx: 0, ky: 0, flash: 0, petalCd: 0, dead: false });
+    const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+    enemies.push({ id: nextId++, kind, x, y, px: x, py: y, hp, kx: 0, ky: 0, flash: 0, petalCd: 0, dead: false });
   }
 
   function pickKind(): EnemyName {
@@ -185,19 +192,21 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     const seeds = lv("seeds");
     reload -= dt;
     if (seeds > 0 && reload <= 0) {
-      const target = nearestEnemy(150);
+      const target = nearestEnemy(170);
       if (target) {
-        reload = (haste() / 2.5) * 0.75 ** Math.floor(seeds / 2);
+        reload = (haste() / 3) * 0.75 ** Math.floor(seeds / 2);
         const count = 1 + Math.floor((seeds - 1) / 2);
         const base = Math.atan2(target.y - player.y, target.x - player.x);
         for (let i = 0; i < count; i++) {
           const a = base + (i - (count - 1) / 2) * 0.2;
-          shots.push({ x: player.x, y: player.y, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, life: 0.7, damage: might() });
+          shots.push({ x: player.x, y: player.y, px: player.x, py: player.y, vx: Math.cos(a) * 240, vy: Math.sin(a) * 240, life: 0.75, damage: might() });
         }
         audio.synth({ freq: 900, freqEnd: 500, decay: 0.05 });
       }
     }
     for (const s of shots) {
+      s.px = s.x;
+      s.py = s.y;
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       s.life -= dt;
@@ -285,13 +294,24 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   const CARD = { w: 96, h: 70, gap: 8, y: 52 };
   const cardX = (i: number) => game.width / 2 - (CARD.w * 3 + CARD.gap * 2) / 2 + i * (CARD.w + CARD.gap);
 
+  const cardAt = (x: number, y: number) =>
+    choices.findIndex((_, i) => x >= cardX(i) && x < cardX(i) + CARD.w && y >= CARD.y && y < CARD.y + CARD.h);
+  let hoverFrom = { x: Number.NaN, y: Number.NaN };
+
   function choose(dt: number) {
     lock = Math.max(0, lock - dt);
     if (lock > 0) return;
     if (input.pressed("left")) cursor = (cursor + choices.length - 1) % choices.length;
     if (input.pressed("right")) cursor = (cursor + 1) % choices.length;
+    // The mouse highlights what it's over, but only once it moves, so it doesn't fight the keys.
+    const { x, y } = input.pointer;
+    if (x !== hoverFrom.x || y !== hoverFrom.y) {
+      const over = cardAt(x, y);
+      if (over >= 0 && !Number.isNaN(hoverFrom.x)) cursor = over;
+      hoverFrom = { x, y };
+    }
     if (input.pointer.pressed) {
-      const i = choices.findIndex((_, i) => input.pointer.x >= cardX(i) && input.pointer.x < cardX(i) + CARD.w && input.pointer.y >= CARD.y && input.pointer.y < CARD.y + CARD.h);
+      const i = cardAt(x, y);
       if (i >= 0) {
         cursor = i;
         take(choices[i]!);
@@ -345,6 +365,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     }
     const damp = Math.exp(-8 * dt);
     for (const e of enemies) {
+      e.px = e.x;
+      e.py = e.y;
       const k = ENEMIES[e.kind];
       const ex = player.x - e.x, ey = player.y - e.y, d = Math.hypot(ex, ey) || 1;
       // Pressed against buff, a critter stops pushing in: the swarm rings buff instead of burying it.
@@ -431,6 +453,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   // ---- drawing ----------------------------------------------------------------------------------
 
   function drawWorld(draw: Draw, alpha: number) {
+    // The same interpolated, rounded point the camera centres on, so buff never wobbles against the world.
+    const px = player.prevX + (player.x - player.prevX) * alpha, py = player.prevY + (player.y - player.prevY) * alpha;
     // Ground: a sparse field of deep-colour pebbles, so movement reads against the dark.
     const cx = Math.floor(game.camera.x / 32), cy = Math.floor(game.camera.y / 32);
     for (let gy = cy - 4; gy <= cy + 4; gy++)
@@ -452,18 +476,22 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     }
     for (const e of enemies) {
       const f = sprite(e.kind, e.id * 0.37);
-      draw.sprite(f, Math.round(e.x - f.w / 2), Math.round(e.y - f.h / 2), e.flash > 0.5 ? { tint: C.text } : undefined);
+      const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha;
+      draw.sprite(f, Math.round(x - f.w / 2), Math.round(y - f.h / 2), e.flash > 0.5 ? { tint: C.text } : undefined);
     }
-    for (const s of shots) draw.sprite(sprite("shot", s.x * 0.1), Math.round(s.x - 2.5), Math.round(s.y - 2.5));
+    for (const s of shots) {
+      const x = s.px + (s.x - s.px) * alpha, y = s.py + (s.y - s.py) * alpha;
+      draw.sprite(sprite("shot", s.x * 0.1), Math.round(x - 2.5), Math.round(y - 2.5));
+    }
     const petals = lv("petals");
     for (let i = 0; i < petals; i++) {
       const a = petalAngle + (i / petals) * Math.PI * 2, r = 18 + petals * 3;
-      draw.sprite(sprite("petal", i), Math.round(player.x + Math.cos(a) * r - 4), Math.round(player.y + Math.sin(a) * r - 4));
+      draw.sprite(sprite("petal", i), Math.round(px + Math.cos(a) * r - 4), Math.round(py + Math.sin(a) * r - 4));
     }
 
     if (phase !== "over" && (player.hurt === 0 || Math.floor(player.hurt * 12) % 2 === 0)) {
       draw.push();
-      draw.translate(player.prevX + (player.x - player.prevX) * alpha, player.prevY + (player.y - player.prevY) * alpha + 8);
+      draw.translate(Math.round(px), Math.round(py) + 8);
       draw.scale(player.scaleX * player.faceX, player.scaleY);
       draw.sprite(sprite("buff"), -8, -16);
       draw.pop();
@@ -508,16 +536,20 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     panel(draw, game.width / 2 - 34, 30, 68, 14);
     text.draw(draw, "LEVEL UP!", game.width / 2, 32, { color: C.buff, align: "center" });
     choices.forEach((u, i) => {
-      const x = cardX(i), next = lv(u.id) + 1;
-      panel(draw, x, CARD.y, CARD.w, CARD.h, i === cursor ? C.buff : C.slate);
-      text.draw(draw, u.name, x + 6, CARD.y + 5, { color: u.kind === "weapon" ? C.buff : C.cyan }, i);
-      text.draw(draw, lv(u.id) ? `lv ${next}` : "new!", x + CARD.w - 6, CARD.y + 5, { color: C.dim, align: "right" }, i + 1);
+      // Cards rise into place while they're locked, so the pause before they take input is visible.
+      const rise = Math.round(((lock / 0.4) ** 2) * (40 + i * 12));
+      const x = cardX(i), y = CARD.y + rise, next = lv(u.id) + 1;
+      panel(draw, x, y, CARD.w, CARD.h, i === cursor && lock === 0 ? C.buff : C.slate);
+      text.draw(draw, u.name, x + 6, y + 5, { color: u.kind === "weapon" ? C.buff : C.cyan }, i);
+      text.draw(draw, lv(u.id) ? `lv ${next}` : "new!", x + CARD.w - 6, y + 5, { color: C.dim, align: "right" }, i + 1);
       wrap(u.text(next), CARD.w - 12).forEach((line, j) => {
-        text.draw(draw, line, x + 6, CARD.y + 22 + j * 12, { color: C.text }, i + j);
+        text.draw(draw, line, x + 6, y + 22 + j * 12, { color: C.text }, i + j);
       });
     });
-    panel(draw, game.width / 2 - 92, CARD.y + CARD.h + 8, 184, 14);
-    text.draw(draw, lock > 0 ? "" : "left/right to pick, space to take", game.width / 2, CARD.y + CARD.h + 10, { color: C.dim, align: "center" }, 2);
+    if (lock === 0) {
+      panel(draw, game.width / 2 - 92, CARD.y + CARD.h + 8, 184, 14);
+      text.draw(draw, "click a card, or arrows + space", game.width / 2, CARD.y + CARD.h + 10, { color: C.dim, align: "center" }, 2);
+    }
   }
 
   function drawEnd(draw: Draw) {

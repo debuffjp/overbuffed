@@ -39,7 +39,7 @@ describe("title", () => {
     game.tap("Space").wait(2);
     expect(game.scene).toBe("run");
     expect(game.state.phase).toBe("play");
-    expect(game.state.player).toEqual({ x: 0, y: 0, hp: 5, maxHp: 5 });
+    expect(game.state.player).toEqual({ x: 0, y: 0, hp: 6, maxHp: 6 });
     expect(game.state.levels).toEqual({ seeds: 1 });
   });
 });
@@ -62,7 +62,7 @@ describe("swarm", () => {
 
   test("a brute arrives as an elite", async () => {
     const game = await start();
-    game.command("skip", 89);
+    game.command("skip", 119);
     game.until((s) => s.brutes >= 1, { within: "3s" });
   });
 

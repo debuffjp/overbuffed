@@ -13,9 +13,9 @@ export interface EnemyKind {
 }
 
 export const ENEMIES = {
-  blob: { frames: "blob", size: 12, hp: 3, speed: 28, damage: 1, xp: 1, weight: 1, dew: 0.005 },
-  spiker: { frames: "spiker", size: 12, hp: 2, speed: 50, damage: 1, xp: 2, weight: 1.4, dew: 0.005 },
-  brute: { frames: "brute", size: 20, hp: 40, speed: 20, damage: 2, xp: 12, weight: 0.2, dew: 0.6 },
+  blob: { frames: "blob", size: 12, hp: 3, speed: 22, damage: 1, xp: 1, weight: 1, dew: 0.01 },
+  spiker: { frames: "spiker", size: 12, hp: 2, speed: 40, damage: 1, xp: 2, weight: 1.4, dew: 0.01 },
+  brute: { frames: "brute", size: 20, hp: 30, speed: 18, damage: 2, xp: 12, weight: 0.2, dew: 0.6 },
 } satisfies Record<string, EnemyKind>;
 
 export type EnemyName = keyof typeof ENEMIES;
@@ -29,4 +29,4 @@ export const WAVES: readonly { from: number; mix: Partial<Record<EnemyName, numb
 ];
 
 /** Brutes are timed elites: the first at `first` seconds, then every `every`. */
-export const ELITES = { first: 90, every: 45 };
+export const ELITES = { first: 120, every: 60 };
