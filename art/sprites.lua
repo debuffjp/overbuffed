@@ -17,6 +17,15 @@ local function inside(s, x, y)
   local px, py = x + 0.5, y + 0.5
   if s.kind == "circle" then
     return (px - s.x)^2 + (py - s.y)^2 <= s.r^2
+  elseif s.kind == "poly" then -- points = { x1, y1, x2, y2, ... }
+    local p, n, inside = s.points, #s.points // 2, false
+    local j = n
+    for i = 1, n do
+      local xi, yi, xj, yj = p[i * 2 - 1], p[i * 2], p[j * 2 - 1], p[j * 2]
+      if (yi > py) ~= (yj > py) and px < (xj - xi) * (py - yi) / (yj - yi) + xi then inside = not inside end
+      j = i
+    end
+    return inside
   elseif s.kind == "rrect" then -- rounded rect: x,y,w,h,r
     local cx = math.max(s.x + s.r, math.min(px, s.x + s.w - s.r))
     local cy = math.max(s.y + s.r, math.min(py, s.y + s.h - s.r))
@@ -138,4 +147,46 @@ end)
 -- shot: a pale seed.
 make("shot", 5, 5, 3, C.shot, function()
   return { { kind = "circle", x = 2.5 + j(0.5), y = 2.5 + j(0.5), r = 2 + j(0.5) } }
+end)
+
+-- spiker: a fast amber thistle, three thorns crowning a round body. Reads as "sharp" next to the round blobs.
+make("spiker", 12, 12, 3, C.amber, function()
+  return {
+    { kind = "poly", points = { 1 + j(0.4), 0.5 + j(0.5), 5 + j(0.3), 6, 2 + j(0.3), 7 } },
+    { kind = "poly", points = { 6 + j(0.4), 0 + j(0.4), 8 + j(0.3), 6, 4 + j(0.3), 6 } },
+    { kind = "poly", points = { 11 + j(0.4), 0.5 + j(0.5), 10 + j(0.3), 7, 7 + j(0.3), 6 } },
+    { kind = "circle", x = 6 + j(0.4), y = 8 + j(0.4), r = 3.6 + j(0.3) },
+    { kind = "rrect", x = 4 + j(0.3), y = 7.4, w = 1.4, h = 2, r = 0.7, hole = true },
+    { kind = "rrect", x = 6.8 + j(0.3), y = 7.4, w = 1.4, h = 2, r = 0.7, hole = true },
+  }
+end)
+
+-- brute: a big violet elite, a lumpy mass of four locked lobes with a wide gap-cut grin.
+make("brute", 20, 20, 3, C.violet, function()
+  return {
+    { kind = "circle", x = 6 + j(0.7), y = 7 + j(0.7), r = 5.4 + j(0.5) },
+    { kind = "circle", x = 14 + j(0.7), y = 7 + j(0.7), r = 5.4 + j(0.5) },
+    { kind = "circle", x = 5.5 + j(0.7), y = 14 + j(0.6), r = 5 + j(0.5) },
+    { kind = "circle", x = 14.5 + j(0.7), y = 14 + j(0.6), r = 5 + j(0.5) },
+    { kind = "circle", x = 10 + j(0.5), y = 11 + j(0.5), r = 6.5 + j(0.4) },
+    { kind = "rrect", x = 6.5 + j(0.4), y = 8.5 + j(0.3), w = 2.2, h = 3, r = 1, hole = true },
+    { kind = "rrect", x = 11.3 + j(0.4), y = 8.5 + j(0.3), w = 2.2, h = 3, r = 1, hole = true },
+    { kind = "rrect", x = 6 + j(0.5), y = 13.5 + j(0.4), w = 8, h = 1.4, r = 0.7, hole = true },
+  }
+end)
+
+-- petal: buff's orbiting weapon, a lime leaf split down the middle.
+make("petal", 8, 8, 3, C.buff, function()
+  return {
+    { kind = "circle", x = 3.2 + j(0.4), y = 4 + j(0.4), r = 3 + j(0.3) },
+    { kind = "circle", x = 4.8 + j(0.4), y = 4 + j(0.4), r = 3 + j(0.3) },
+  }
+end)
+
+-- dew: a cyan heal pickup, a droplet.
+make("dew", 7, 8, 3, C.cyan, function()
+  return {
+    { kind = "poly", points = { 3.5 + j(0.3), 0.3, 6 + j(0.3), 5, 1 + j(0.3), 5 } },
+    { kind = "circle", x = 3.5 + j(0.3), y = 5.2 + j(0.3), r = 2.6 + j(0.2) },
+  }
 end)

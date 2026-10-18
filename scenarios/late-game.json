@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/@debuffjp/cli/schema/scenario.schema.json",
+  "steps": [
+    { "set": { "player.hp": 50, "run.xp": 0 } },
+    { "wait": 10 },
+    { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
+    { "command": "give", "args": ["petals"] },
+    { "command": "give", "args": ["petals"] },
+    { "command": "give", "args": ["petals"] },
+    { "command": "give", "args": ["pulse"] },
+    { "command": "give", "args": ["seeds"] },
+    { "command": "give", "args": ["seeds"] },
+    { "command": "skip", "args": [400] },
+    { "set": { "swarm.rate": 30 } },
+    { "wait": 600 },
+    { "expect": { "state.enemies": { "gt": 150 } } },
+    { "capture": "swarm" },
+    { "flashes": 240 }
+  ]
+}

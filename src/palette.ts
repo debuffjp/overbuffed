@@ -6,6 +6,7 @@ export const C = {
   ink: "#0e0f14", // ground, and the colour of every contour gap
   deep: "#1d2030", // background silhouettes (props, terrain)
   slate: "#3a3f58", // midground silhouettes, UI panels
+  dim: "#9ba1bb", // secondary text: readable (4.5:1+) on deep and ink
   buff: "#cffb2d", // player and XP only
   shot: "#f4ffd0", // player projectiles
   rose: "#ff5d73", // enemy family A

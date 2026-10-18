@@ -1,0 +1,17 @@
+{
+  "$schema": "../node_modules/@debuffjp/cli/schema/scenario.schema.json",
+  "steps": [
+    { "wait": 10 },
+    { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
+    { "until": { "events.kill": { "gte": 3 } }, "within": 1200 },
+    { "command": "levels", "args": [1] },
+    { "wait": 2 },
+    { "expect": { "state.phase": { "eq": "choose" } } },
+    { "capture": "cards" },
+    { "contrast": [16, 52, 96, 70] },
+    { "wait": 30 },
+    { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
+    { "wait": 2 },
+    { "expect": { "state.phase": { "eq": "play" } } }
+  ]
+}

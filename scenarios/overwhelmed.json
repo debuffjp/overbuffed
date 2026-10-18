@@ -1,11 +1,12 @@
 {
   "$schema": "../node_modules/@debuffjp/cli/schema/scenario.schema.json",
   "steps": [
-    { "set": { "swarm.rate": 20 } },
+    { "set": { "swarm.rate": 20, "player.hp": 1 } },
     { "wait": 10 },
-    { "until": { "state.over": { "eq": true } }, "within": 3600 },
+    { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
+    { "until": { "state.phase": { "eq": "over" } }, "within": 3600 },
     { "wait": 30 },
     { "capture": "game-over" },
-    { "contrast": [100, 70, 120, 42] }
+    { "contrast": [90, 58, 140, 64] }
   ]
 }

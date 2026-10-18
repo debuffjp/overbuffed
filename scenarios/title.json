@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/@debuffjp/cli/schema/scenario.schema.json",
+  "steps": [
+    { "wait": 20 },
+    { "expect": { "scene": { "eq": "title" } } },
+    { "capture": "title" },
+    { "contrast": [100, 100, 120, 30] }
+  ]
+}
