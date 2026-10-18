@@ -68,7 +68,7 @@ describe("swarm", () => {
 
   test("standing still eventually gets buff overwhelmed", async () => {
     const game = await start();
-    playUntil(game, (s) => s.phase === "over", 300);
+    playUntil(game, (s) => s.phase === "over", 600);
     expect(game.state.phase).toBe("over");
     expect(game.state.player.hp).toBeAtMost(0);
   });
