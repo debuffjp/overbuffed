@@ -16,7 +16,7 @@ export interface TitleDeps {
 /** The title: the name, big and boiling, with buff bobbing and a few critters drifting past. */
 export function createTitle({ game, input, text, frames, save }: TitleDeps): Scene {
   const buff = frames("buff");
-  const critters = ["blob", "spiker", "blob", "brute", "blob", "spiker"].map((n) => frames(n));
+  const critters = ["blob", "spiker", "blob", "spiker", "blob", "spiker"].map((n) => frames(n));
   let t = 0;
 
   return {
