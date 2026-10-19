@@ -1,17 +1,17 @@
-// "Night garden", silhouette-first. Every sprite is one flat fill; shapes are separated by
-// boiling contour gaps of `ink`, never by outlines, shading or gradients.
-// Buff is the only lime thing on screen, so the player always reads first.
-// Enemies are warm; rose and amber also differ by silhouette, never by colour alone.
+// debuff's "squish" palette. Soft, flat, rounded shapes on a dark olive ink; no outlines, no pixel art.
+// Lime is buff and XP only, so the player always reads first. Each enemy family has its own colour *and*
+// its own silhouette, so the swarm stays readable without telling hues apart.
 export const C = {
-  ink: "#0e0f14", // ground, and the colour of every contour gap
-  deep: "#1d2030", // background silhouettes (props, terrain)
-  slate: "#3a3f58", // midground silhouettes, UI panels
-  dim: "#9ba1bb", // secondary text: readable (4.5:1+) on deep and ink
-  buff: "#cffb2d", // player and XP only
-  shot: "#f4ffd0", // player projectiles
-  rose: "#ff5d73", // enemy family A
-  amber: "#ff9f43", // enemy family B
-  violet: "#b06cff", // elites and bosses
-  cyan: "#5ee6ff", // pickups and UI accent
-  text: "#eef0f6",
+  ink: "#11140d", // background, and the colour of every eye
+  panel: "#1b2014", // panels, ground pebbles
+  panelAlt: "#20261a",
+  highlight: "#2a3320", // selected card, empty HUD pips
+  text: "#d3dcc2",
+  muted: "#6b7560",
+  buff: "#cffb2d", // the player and XP
+  sky: "#38bdf8", // buff's weapons: seeds, petals, pulse
+  pink: "#f472b6", // blob (round)
+  amber: "#fbbf24", // spiker (diamond)
+  lilac: "#a78bfa", // brute, the elite (pill)
+  mint: "#34d399", // healing dew (drop)
 } as const;

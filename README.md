@@ -13,4 +13,4 @@ npm test      # logic tests + scenarios
 - Code layout: `src/scenes/`, `src/systems/`, `src/content/` (enemies, weapons and upgrades as data).
 - Art: see [ART.md](ART.md). Debuff issues found along the way: [FRICTION.md](FRICTION.md).
 
-License: code MIT ([LICENSE](LICENSE)), art in `assets/` and `art/` CC BY 4.0.
+License: MIT ([LICENSE](LICENSE)). The art is drawn in code, so it is MIT too.

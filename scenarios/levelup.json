@@ -9,7 +9,7 @@
     { "expect": { "state.phase": { "eq": "choose" } } },
     { "wait": 30 },
     { "capture": "cards" },
-    { "contrast": [16, 52, 96, 70] },
+    { "contrast": [12, 56, 88, 62] },
     { "press": "Space" }, { "wait": 1 }, { "release": "Space" },
     { "wait": 2 },
     { "expect": { "state.phase": { "eq": "play" } } }

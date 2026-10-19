@@ -1,13 +1,14 @@
 import type { Audio } from "@debuffjp/audio";
-import type { Draw, Frame, Game, Scene, Storage } from "@debuffjp/core";
+import type { Draw, Frame, Game, Scene, SpriteDrawOptions, Storage } from "@debuffjp/core";
 import type { Input } from "@debuffjp/input";
 import { type Particles, squash, type Tweens } from "@debuffjp/juice";
 import { ELITES, ENEMIES, type EnemyName, WAVES } from "../content/enemies";
 import { MAX_LEVEL, UPGRADES, type Upgrade, type UpgradeId } from "../content/upgrades";
+import { panel } from "@debuffjp/ui";
 import { C } from "../palette";
-import { boil } from "../systems/boil";
 import { Grid } from "../systems/grid";
-import type { BoilText } from "../systems/text";
+import { S, type ShapeName } from "../systems/shapes";
+import { bigText } from "./title";
 
 export type Actions = "left" | "right" | "up" | "down" | "confirm";
 
@@ -17,8 +18,7 @@ export interface RunDeps {
   audio: Audio;
   tweens: Tweens;
   particles: Particles;
-  frames: (name: string) => readonly Frame[];
-  text: BoilText;
+  shapes: Record<ShapeName, Frame>;
   save: Storage<{ best: number; wins: number }>;
 }
 
@@ -42,8 +42,10 @@ interface Gem { x: number; y: number; xp: number; dew: boolean; taken: boolean }
 type Phase = "play" | "choose" | "over" | "won";
 
 const PLAYER_R = 8;
+const ENEMY_COLOUR: Record<EnemyName, string> = { blob: C.pink, spiker: C.amber, brute: C.lilac };
+const POP_TIME = 0.16;
 
-export function createRun({ game, input, audio, tweens, particles, frames, text, save }: RunDeps) {
+export function createRun({ game, input, audio, tweens, particles, shapes, save }: RunDeps) {
   const tune = game.params.define("player", {
     speed: { type: "number", default: 80, min: 0, max: 300, units: "px/s" },
     accel: { type: "number", default: 900, min: 0, max: 5000, units: "px/s²" },
@@ -64,10 +66,6 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     xp: { type: "number", default: 1, min: 0, max: 5, description: "XP multiplier: lower means fewer level-ups" },
   });
 
-  const sheets = Object.fromEntries(
-    ["buff", "gem", "shot", "petal", "dew", ...Object.keys(ENEMIES)].map((n) => [n, frames(n)]),
-  ) as Record<string, readonly Frame[]>;
-  const sprite = (name: string, phase = 0) => sheets[name]![boil(game, phase)]!;
   const grid = new Grid<Enemy>(24);
 
   const player = { x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0, hp: 0, hurt: 0, scaleX: 1, scaleY: 1, faceX: 1 };
@@ -92,6 +90,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   let kills = 0;
   let xp = 0;
   let level = 1;
+  /** Critters that just died, squashing flat and popping. Drawing only: gameplay never reads it. */
+  let pops: { x: number; y: number; kind: EnemyName; t: number }[] = [];
 
   const lv = (id: UpgradeId) => levels[id] ?? 0;
   const might = () => 1 + 0.25 * lv("might");
@@ -121,6 +121,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     kills = 0;
     xp = 0;
     level = 1;
+    pops = [];
     // Locked to buff, so buff and the world round to the same pixel every frame (no 1px shimmy).
     game.camera.lerp = 0;
     game.camera.deadzone = { x: 0, y: 0 };
@@ -166,8 +167,9 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     e.dead = true;
     kills++;
     const kind = ENEMIES[e.kind];
-    const colors = { blob: C.rose, spiker: C.amber, brute: C.violet }[e.kind];
-    particles.emit({ x: e.x, y: e.y, count: e.kind === "brute" ? 24 : 6, colors: [colors], speed: [20, e.kind === "brute" ? 120 : 60], gravity: 0 });
+    const colors = ENEMY_COLOUR[e.kind];
+    particles.emit({ x: e.x, y: e.y, count: e.kind === "brute" ? 24 : 6, colors: [colors], speed: [20, e.kind === "brute" ? 120 : 60], gravity: 0, shape: "circle" });
+    if (pops.length < 200) pops.push({ x: e.x, y: e.y, kind: e.kind, t: 0 });
     if (game.random.next() < kind.dew) gems.push({ x: e.x, y: e.y, xp: 0, dew: true, taken: false });
     // Too many gems on the floor: fold this one into an existing gem instead of adding another.
     if (gems.length > 300) gems[game.random.int(0, gems.length - 1)]!.xp += kind.xp;
@@ -272,7 +274,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
     levels[u.id] = lv(u.id) + 1;
     if (u.id === "heart") player.hp = Math.min(maxHp(), player.hp + 1);
     squash(tweens, player, 0.5);
-    particles.emit({ x: player.x, y: player.y, count: 20, colors: [C.buff, C.shot], speed: [40, 120], gravity: 0 });
+    particles.emit({ x: player.x, y: player.y, count: 20, colors: [C.buff, C.sky], speed: [40, 120], gravity: 0, shape: "circle" });
     audio.synth({ freq: 500, freqEnd: 1000, decay: 0.15 });
     game.emit("upgrade", { id: u.id, level: levels[u.id] });
     pending--;
@@ -412,7 +414,7 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
         grid.near(player.x, player.y, tune.values.pop, (o) => {
           if ((o.x - player.x) ** 2 + (o.y - player.y) ** 2 <= tune.values.pop ** 2) hit(o, 0, 260);
         });
-        particles.emit({ x: player.x, y: player.y, count: 14, colors: [C.buff], speed: [60, 140], gravity: 0 });
+        particles.emit({ x: player.x, y: player.y, count: 14, colors: [C.buff], speed: [60, 140], gravity: 0, shape: "circle" });
         squash(tweens, player, 0.4);
         game.camera.shake(0.35);
         audio.synth({ freq: 200, freqEnd: 60, decay: 0.2 });
@@ -462,79 +464,116 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   }
 
   // ---- drawing ----------------------------------------------------------------------------------
+  // Everything is a baked squish shape (src/systems/shapes.ts) drawn as a sprite. Crowds go through
+  // `draw.sprites`, one call per shape, so a 400-critter swarm costs a handful of draw calls.
+
+  const SHAPE = { scaleX: S, scaleY: S, smooth: true } as const;
+  const batches = {
+    blob: new Batch(),
+    spiker: new Batch(),
+    shot: new Batch(),
+    petal: new Batch(),
+    gem: new Batch(),
+    dew: new Batch(),
+  };
 
   function drawWorld(draw: Draw, alpha: number) {
-    // The same interpolated, rounded point the camera centres on, so buff never wobbles against the world.
+    const t = game.clock.time, still = game.reducedMotion;
+    // The same interpolated point the camera centres on, so buff holds still on screen.
     const px = player.prevX + (player.x - player.prevX) * alpha, py = player.prevY + (player.y - player.prevY) * alpha;
-    // Ground: a sparse field of deep-colour pebbles, so movement reads against the dark.
+    // Ground: a sparse, calm field of soft pebbles, just enough for movement to read.
     const cx = Math.floor(game.camera.x / 32), cy = Math.floor(game.camera.y / 32);
     for (let gy = cy - 4; gy <= cy + 4; gy++)
       for (let gx = cx - 7; gx <= cx + 7; gx++) {
         const h = Math.imul(gx * 374761393 + gy * 668265263, 1274126177) >>> 0;
-        if (h % 5 === 0) draw.circle(gx * 32 + (h % 23), gy * 32 + ((h >> 8) % 23), 2 + ((h >> 16) % 3), C.deep);
+        if (h % 5 === 0) draw.circle(gx * 32 + (h % 23), gy * 32 + ((h >> 8) % 23), 2 + ((h >> 16) % 3), C.panel);
       }
 
     if (pulseFx > 0) {
-      const t = 1 - pulseFx / 0.3, r = pulseRadius() * (0.4 + 0.6 * t);
+      // A ring of soft sky dots that swells out and fades.
+      const k = 1 - pulseFx / 0.3, r = pulseRadius() * (0.4 + 0.6 * k);
+      draw.alpha = 1 - k * 0.7;
       for (let i = 0; i < 24; i++) {
-        const a = (i / 24) * Math.PI * 2 + boil(game) * 0.1;
-        draw.rect(Math.round(player.x + Math.cos(a) * r) - 1, Math.round(player.y + Math.sin(a) * r) - 1, 3, 3, C.cyan);
+        const a = (i / 24) * Math.PI * 2;
+        draw.circle(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r, 1.8, C.sky);
       }
+      draw.alpha = 1;
     }
-    for (const g of gems) {
-      const f = sprite(g.dew ? "dew" : "gem", g.x * 0.13);
-      draw.sprite(f, Math.round(g.x - f.w / 2), Math.round(g.y - f.h / 2));
-    }
+
+    // XP gems and dew bob gently, out of step.
+    for (const g of gems) (g.dew ? batches.dew : batches.gem).add(g.x, g.y + (still ? 0 : Math.sin(t * 4 + g.x * 0.13) * 1.2));
+    batches.gem.flush(draw, shapes.gem, SHAPE);
+    batches.dew.flush(draw, shapes.dew, SHAPE);
+
+    // Critters jiggle (a little tilt and breath each, desynced by id) and swell when hit.
     for (const e of enemies) {
-      const f = sprite(e.kind, e.id * 0.37);
       const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha;
-      draw.sprite(f, Math.round(x - f.w / 2), Math.round(y - f.h / 2), e.flash > 0.5 ? { tint: C.text } : undefined);
+      const w = still ? 0 : Math.sin(t * 5 + e.id * 1.7);
+      if (e.kind === "brute" || e.flash > 0.5) {
+        // Brutes, and anything flashing from a hit, squash and stretch for real (non-uniform scale).
+        const f = still ? 0 : e.flash, s = w * 0.05;
+        draw.sprite(shapes[e.kind], x, y, {
+          scaleX: S * (1 + s + f * 0.3),
+          scaleY: S * (1 - s - f * 0.25),
+          flash: e.flash > 0.5 ? 0.3 : 0,
+          smooth: true,
+        });
+      } else batches[e.kind].add(x, y, 1 + w * 0.04 + (still ? 0 : e.flash * 0.25), w * 0.12);
     }
-    for (const s of shots) {
-      const x = s.px + (s.x - s.px) * alpha, y = s.py + (s.y - s.py) * alpha;
-      draw.sprite(sprite("shot", s.x * 0.1), Math.round(x - 3), Math.round(y - 3));
-    }
+    batches.blob.flush(draw, shapes.blob, SHAPE);
+    batches.spiker.flush(draw, shapes.spiker, SHAPE);
+
+    // The fallen: squash flat, swell sideways and fade.
+    if (!still)
+      for (const p of pops) {
+        const k = p.t / POP_TIME;
+        draw.sprite(shapes[p.kind], p.x, p.y, { scaleX: S * (1 + k * 0.7), scaleY: S * (1 - k * 0.8), alpha: 1 - k, smooth: true });
+      }
+
+    for (const s of shots) batches.shot.add(s.px + (s.x - s.px) * alpha, s.py + (s.y - s.py) * alpha);
+    batches.shot.flush(draw, shapes.shot, SHAPE);
     const petals = lv("petals");
     for (let i = 0; i < petals; i++) {
       const a = petalAngle + (i / petals) * Math.PI * 2, r = 24 + petals * 3;
-      draw.sprite(sprite("petal", i), Math.round(px + Math.cos(a) * r - 5), Math.round(py + Math.sin(a) * r - 5));
+      batches.petal.add(px + Math.cos(a) * r, py + Math.sin(a) * r, 1, a + Math.PI / 2);
     }
+    batches.petal.flush(draw, shapes.petal, SHAPE);
 
     if (phase !== "over" && (player.hurt === 0 || Math.floor(player.hurt * 12) % 2 === 0)) {
-      draw.push();
-      draw.translate(Math.round(px), Math.round(py) + 11);
-      draw.scale(player.scaleX * player.faceX, player.scaleY);
-      draw.sprite(sprite("buff"), -11, -22);
-      draw.pop();
+      // buff squashes from its feet: the squash() tween when hit or levelling up, a gentle wobble when idle.
+      const w = still || tweens.has(player, "scaleX") ? 0 : Math.sin(t * 4) * 0.05;
+      const sx = still ? 1 : player.scaleX + w, sy = still ? 1 : player.scaleY - w;
+      draw.sprite(shapes.buff, px, py + 9, { origin: [0.5, 1], scaleX: S * sx, scaleY: S * sy, flipX: player.faceX < 0, smooth: true });
     }
     particles.draw(draw);
   }
 
   function drawHud(draw: Draw) {
-    if (maxHp() <= 12) for (let i = 0; i < maxHp(); i++) draw.rect(4 + i * 7, 4, 5, 5, i < player.hp ? C.buff : C.slate);
+    if (maxHp() <= 12) for (let i = 0; i < maxHp(); i++) draw.circle(7 + i * 8, 7, 3, i < player.hp ? C.buff : C.highlight);
     else {
-      draw.rect(4, 4, 5, 5, C.buff);
-      text.draw(draw, `${player.hp}/${maxHp()}`, 12, 2, { color: C.text }, 4);
+      draw.circle(7, 7, 3, C.buff);
+      draw.text(`${player.hp}/${maxHp()}`, 13, 7, { color: C.text, baseline: "middle" });
     }
-    draw.rect(4, 12, 80, 3, C.deep);
-    draw.rect(4, 12, Math.round(80 * (xp / xpToLevel(level))), 3, C.buff);
-    text.draw(draw, `LV ${level}`, 88, 10, { color: C.text, baseline: "middle" }, 1);
+    box(draw, 4, 13, 80, 4, C.panel, 2);
+    const fill = Math.round(80 * (xp / xpToLevel(level)));
+    if (fill > 0) box(draw, 4, 13, Math.max(4, fill), 4, C.buff, 2);
+    draw.text(`lv ${level}`, 88, 15, { color: C.text, baseline: "middle" });
     const left = Math.max(0, Math.ceil(run.values.length - time));
-    text.draw(draw, `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`, game.width - 4, 4, { color: C.text, align: "right" }, 2);
-    text.draw(draw, `${kills}`, game.width - 4, 16, { color: C.dim, align: "right" }, 3);
+    draw.text(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`, game.width - 4, 4, { color: C.text, align: "right" });
+    draw.text(`${kills}`, game.width - 4, 15, { color: C.text, align: "right" });
   }
 
-  function panel(draw: Draw, x: number, y: number, w: number, h: number, border: string = C.slate) {
-    draw.rect(x - 2, y - 2, w + 4, h + 4, border);
-    draw.rect(x, y, w, h, C.ink);
+  /** A soft squish panel: @debuffjp/ui's rounded box, no outline. */
+  function box(draw: Draw, x: number, y: number, w: number, h: number, fill: string = C.panel, radius = 6) {
+    panel(draw, x, y, w, h, [], fill, 0, radius);
   }
 
-  function wrap(s: string, width: number): string[] {
+  function wrap(draw: Draw, s: string, width: number): string[] {
     const lines: string[] = [];
     let line = "";
     for (const word of s.split(" ")) {
       const next = line ? `${line} ${word}` : word;
-      if (line && text.font.measure(next).w > width) {
+      if (line && draw.measure(next).w > width) {
         lines.push(line);
         line = word;
       } else line = next;
@@ -544,33 +583,36 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   }
 
   function drawChoices(draw: Draw) {
-    panel(draw, game.width / 2 - 34, 30, 68, 14);
-    text.draw(draw, "LEVEL UP!", game.width / 2, 32, { color: C.buff, align: "center" });
+    box(draw, game.width / 2 - 40, 28, 80, 16);
+    draw.text("level up!", game.width / 2, 36, { color: C.buff, align: "center", baseline: "middle" });
     choices.forEach((u, i) => {
       // Cards rise into place while they're locked, so the pause before they take input is visible.
       const rise = Math.round(((lock / 0.4) ** 2) * (40 + i * 12));
-      const x = cardX(i), y = CARD.y + rise, next = lv(u.id) + 1;
-      panel(draw, x, y, CARD.w, CARD.h, i === cursor && lock === 0 ? C.buff : C.slate);
-      text.draw(draw, u.name, x + 6, y + 5, { color: u.kind === "weapon" ? C.buff : C.cyan }, i);
-      text.draw(draw, lv(u.id) ? `lv ${next}` : "new!", x + CARD.w - 6, y + 5, { color: C.dim, align: "right" }, i + 1);
-      wrap(u.text(next), CARD.w - 12).forEach((line, j) => {
-        text.draw(draw, line, x + 6, y + 22 + j * 12, { color: C.text }, i + j);
+      const on = i === cursor && lock === 0;
+      const x = cardX(i), y = CARD.y + rise - (on ? 2 : 0), next = lv(u.id) + 1;
+      box(draw, x, y, CARD.w, CARD.h);
+      // The selected card lifts and gets a lime nub, instead of an outline.
+      if (on) box(draw, x + CARD.w / 2 - 10, y + CARD.h - 7, 20, 3, C.buff, 1.5);
+      draw.text(u.name, x + 7, y + 6, { color: u.kind === "weapon" ? C.buff : C.sky });
+      draw.text(lv(u.id) ? `lv ${next}` : "new!", x + CARD.w - 7, y + 6, { color: lv(u.id) ? C.text : C.pink, align: "right" });
+      wrap(draw, u.text(next), CARD.w - 14).forEach((line, j) => {
+        draw.text(line, x + 7, y + 22 + j * 11, { color: C.text });
       });
     });
     if (lock === 0) {
-      panel(draw, game.width / 2 - 92, CARD.y + CARD.h + 8, 184, 14);
-      text.draw(draw, "click a card, or arrows + space", game.width / 2, CARD.y + CARD.h + 10, { color: C.dim, align: "center" }, 2);
+      box(draw, game.width / 2 - 92, CARD.y + CARD.h + 7, 184, 16);
+      draw.text("click a card, or arrows + space", game.width / 2, CARD.y + CARD.h + 15, { color: C.text, align: "center", baseline: "middle" });
     }
   }
 
   function drawEnd(draw: Draw) {
     const won = phase === "won";
-    panel(draw, game.width / 2 - 70, 58, 140, 64);
-    text.draw(draw, won ? "OVERBUFFED!" : "OVERWHELMED", game.width / 2, 66, { color: won ? C.buff : C.rose, align: "center" });
+    box(draw, game.width / 2 - 70, 58, 140, 64, C.panel, 10);
+    bigText(draw, won ? "overbuffed!" : "overwhelmed", game.width / 2, 64, 2, won ? C.buff : C.pink);
     const s = Math.floor(time);
-    text.draw(draw, `${kills} critters - ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`, game.width / 2, 84, { color: C.text, align: "center" }, 1);
-    text.draw(draw, `level ${level}`, game.width / 2, 96, { color: C.dim, align: "center" }, 3);
-    text.draw(draw, "press space", game.width / 2, 108, { color: C.cyan, align: "center" }, 2);
+    draw.text(`${kills} critters - ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`, game.width / 2, 84, { color: C.text, align: "center" });
+    draw.text(`level ${level}`, game.width / 2, 96, { color: C.text, align: "center" });
+    draw.text("press space", game.width / 2, 108, { color: C.buff, align: "center" });
   }
 
   const scene: Scene = {
@@ -584,6 +626,8 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
       game.camera.follow(player);
       tweens.update(dt);
       particles.update(dt);
+      for (const p of pops) p.t += dt;
+      pops = pops.filter((p) => p.t < POP_TIME);
     },
 
     render(draw, alpha) {
@@ -628,4 +672,37 @@ export function createRun({ game, input, audio, tweens, particles, frames, text,
   };
 
   return { scene, commands };
+}
+
+/** Positions, scales and tilts for one `draw.sprites` call, reused every frame (no per-frame allocation). */
+class Batch {
+  pos = new Float32Array(512);
+  scale = new Float32Array(256);
+  rot = new Float32Array(256);
+  n = 0;
+
+  add(x: number, y: number, scale = 1, rotation = 0) {
+    if (this.n === this.scale.length) this.grow();
+    const i = this.n++;
+    this.pos[i * 2] = x;
+    this.pos[i * 2 + 1] = y;
+    this.scale[i] = scale;
+    this.rot[i] = rotation;
+  }
+
+  private grow() {
+    const pos = new Float32Array(this.pos.length * 2), scale = new Float32Array(this.scale.length * 2), rot = new Float32Array(this.rot.length * 2);
+    pos.set(this.pos);
+    scale.set(this.scale);
+    rot.set(this.rot);
+    this.pos = pos;
+    this.scale = scale;
+    this.rot = rot;
+  }
+
+  /** Draws everything added since the last flush, then empties the batch. */
+  flush(draw: Draw, frame: Frame, options: SpriteDrawOptions) {
+    if (this.n) draw.sprites(frame, this.pos, this.n, options, { scale: this.scale, rotation: this.rot });
+    this.n = 0;
+  }
 }

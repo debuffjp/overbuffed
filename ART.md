@@ -1,33 +1,42 @@
 # Art direction
 
-**Silhouette-first night garden, boiling everywhere.**
+**Squish: soft, round, flat critters on a calm dark ground.** Overbuffed uses debuff's own house look,
+the one in the `squish` template.
 
 ## Shapes
-- Every sprite is a **bold flat silhouette** in one fill colour: no outlines, shading, gradients or highlights.
-- Shapes are built from chunky rounded forms (circles, soft-cornered squares, petal clusters) that
-  **pile up and lock together**. Where two shapes touch, they're separated by a thin (1px) **contour gap**
-  in `ink`, the ground colour showing through. Gaps carry all the detail: eyes, limbs, hands, overlaps.
-- Contour lines are playful and hand-drawn, not geometric-perfect.
-- Reference: a flat graphic mark where rounded black shapes cluster into a petal-like mass and a figure
-  hugs it, with only thin cut-out lines separating them. We translate that into colour on a dark ground.
+- Every shape is **flat, rounded and soft**: circles and round-cornered rects. No outlines, shading,
+  gradients, highlights or jagged pixel edges.
+- Characters get **two ink dot eyes**, and nothing else for a face.
+- Every enemy family has **its own silhouette as well as its own colour**, so a crowd reads without telling
+  hues apart:
+  - blob: round, pink
+  - spiker: diamond, amber
+  - brute (elite): big pill, lilac
+- buff's weapons are sky: seed shots are dots, petals are little pills that point along their orbit, and
+  the pulse is a ring of dots. XP gems are small lime diamonds; healing dew is a mint drop.
 
 ## Colour
-- Dark `ink` ground, sparse flat fills from `src/palette.ts` only. Most of the screen is ink, deep and slate.
-- Lime is buff and XP only. Warm fills mean danger. Cyan means good. Violet means elite.
-- Enemy families differ by silhouette as well as colour.
+- Only the squish palette in `src/palette.ts`. The ground is ink `#11140d`, kept sparse and calm (a few soft
+  pebbles in the panel colour) so the swarm always reads.
+- **Lime is buff and XP only.** Sky is buff's weapons. Pink, amber and lilac are enemies. Mint heals.
+- Text is `#d3dcc2`, or lime for what you act on. Muted `#6b7560` isn't used for text: it's below 4.5:1.
 
-## Boil
-- Feel: Baba Is You. Chunky silhouettes whose outer edge nibbles and sprouts single pixels each frame;
-  eyes and contour gaps stay crisp. `art/sprites.lua` generates the first pass in Aseprite.
-- Every sprite, tile, UI frame and glyph has **3 hand-redrawn frames** looping at ~8 fps (line boil).
-  What boils is mostly the contour gaps and silhouette edges, so the whole screen wobbles like a flipbook.
-- Redraw each frame by nudging the gaps and edges by 1px. Never just shift the whole sprite.
-- Boil phase is offset per entity (from its id), so a crowd shimmers instead of pulsing in sync.
-- Reduced motion: boil pauses on frame 0. Gameplay animation is unaffected.
+## Motion
+- Squash and stretch from the feet (`squash()` from `@debuffjp/juice`): buff squashes when hit or levelling up.
+- Idle wobble: buff breathes; critters tilt and breathe, each out of step (phase from its id).
+- Hit critters swell and squash for a moment with a soft flash. Dying critters squash flat, swell sideways and
+  fade, with round particles in their colour.
+- Gems bob. Title critters pop in with an `outBack` overshoot, then hop.
+- Reduced motion: no wobble, squash, bob, pops or pop-ins. Gameplay is unaffected.
+
+## Text and UI
+- debuff sans (the default `draw.text` font), scaled up for headings.
+- Panels and cards are `@debuffjp/ui`'s rounded, outline-free boxes in the panel colour. The selected card
+  lifts and gets a lime nub instead of a border.
 
 ## Pipeline
-- Draw in Aseprite (via an Aseprite MCP server, configured per machine). Sources go in `art/*.aseprite`.
-  Exported sheets go to `assets/` as `name@WxH.png`, frames left to right: boil 0, 1, 2, then action frames.
-- 320×180, integer scale. Buff (lime, gap-cut eyes, squash and stretch) is the hero.
-- Text: **buffont**, our own pixel font (`art/font.lua` → `assets/font@6x11.png`, 5×7 caps, proportional).
-  It boils by hopping each glyph a pixel up or down per frame; glyph shapes never change, so text stays legible.
+- No image assets. Every shape is painted in code at startup (`src/systems/shapes.ts`) into one atlas canvas
+  at 8 texture pixels per game pixel, then drawn as sprites. Crowds (critters, shots, petals, gems) go through
+  `draw.sprites`, one call per shape.
+- 320×180 logical, smooth scaling (not pixel art), so shapes stay soft at any screen size.
+- To change a shape, edit its painter in `shapes.ts`; to change a colour, edit `palette.ts`.

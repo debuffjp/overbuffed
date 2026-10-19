@@ -1,4 +1,3 @@
-import { Assets } from "@debuffjp/assets";
 import { Audio } from "@debuffjp/audio";
 import { Game, Storage } from "@debuffjp/core";
 import { devOverlay, devTools } from "@debuffjp/dev";
@@ -7,12 +6,12 @@ import { Particles, Tweens } from "@debuffjp/juice";
 import { C } from "./palette";
 import { createRun } from "./scenes/run";
 import { createTitle } from "./scenes/title";
-import { BoilText } from "./systems/text";
+import { bakeShapes } from "./systems/shapes";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error('Missing <canvas id="game">');
 
-const game = new Game({ canvas, width: 320, height: 180, pixelArt: true, scale: "integer", background: C.ink });
+const game = new Game({ canvas, width: 320, height: 180, background: C.ink });
 const input = new Input(game, {
   bindings: {
     left: ["ArrowLeft", "KeyA", "PadLeft", "PadStickLeft"],
@@ -27,13 +26,11 @@ const tweens = new Tweens();
 const particles = new Particles(() => game.random.next());
 const save = new Storage("overbuffed", { best: 0, wins: 0 });
 
-const assets = new Assets(await (await fetch("assets/manifest.json")).json());
-await assets.load();
-const frames = (name: string) => assets.frames(name);
-const text = new BoilText(game, frames("font"));
+// Every shape is painted in code at startup (src/systems/shapes.ts): no image assets.
+const shapes = bakeShapes();
 
-const run = createRun({ game, input, audio, tweens, particles, frames, text, save });
-game.add(createTitle({ game, input, text, frames, save })).add(run.scene).go("title");
+const run = createRun({ game, input, audio, tweens, particles, shapes, save });
+game.add(createTitle({ game, input, shapes, save })).add(run.scene).go("title");
 game.start();
 
 // Dev-only: window.__DEBUFF_DEV__ for scenarios and agents (commands: skip, levels, give), and the overlay (`).

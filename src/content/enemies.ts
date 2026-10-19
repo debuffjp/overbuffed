@@ -1,4 +1,4 @@
-/** Enemy families as data. `frames` is the asset name of a 3-frame boil sheet. */
+/** Enemy families as data. Each kind is drawn with the shape of the same name (src/systems/shapes.ts). */
 export interface EnemyKind {
   frames: string;
   size: number;

@@ -1,22 +1,29 @@
-import type { Frame, Game, Scene, Storage } from "@debuffjp/core";
+import type { Draw, Frame, Game, Scene, Storage } from "@debuffjp/core";
 import type { Input } from "@debuffjp/input";
+import { ease } from "@debuffjp/juice";
 import { C } from "../palette";
-import { boil } from "../systems/boil";
-import type { BoilText } from "../systems/text";
+import { S, type ShapeName } from "../systems/shapes";
 import type { Actions } from "./run";
 
 export interface TitleDeps {
   game: Game;
   input: Input<Actions>;
-  text: BoilText;
-  frames: (name: string) => readonly Frame[];
+  shapes: Record<ShapeName, Frame>;
   save: Storage<{ best: number; wins: number }>;
 }
 
-/** The title: the name, big and boiling, with buff bobbing and a few critters drifting past. */
-export function createTitle({ game, input, text, frames, save }: TitleDeps): Scene {
-  const buff = frames("buff");
-  const critters = ["blob", "spiker", "blob", "spiker", "blob", "spiker"].map((n) => frames(n));
+/** Text in debuff sans, scaled up, centred on x with its top at y. */
+export function bigText(draw: Draw, text: string, x: number, y: number, size: number, color: string) {
+  draw.push();
+  draw.translate(x, y);
+  draw.scale(size);
+  draw.text(text, 0, 0, { color, align: "center" });
+  draw.pop();
+}
+
+/** The title: the name, big and lime, buff in the middle and a few critters bobbing along the bottom. */
+export function createTitle({ game, input, shapes, save }: TitleDeps): Scene {
+  const critters: ShapeName[] = ["blob", "spiker", "blob", "brute", "spiker", "blob"];
   let t = 0;
 
   return {
@@ -30,34 +37,31 @@ export function createTitle({ game, input, text, frames, save }: TitleDeps): Sce
       if (input.pressed("confirm") || input.pointer.pressed) game.go("run");
     },
     render(draw) {
-      // Critters parade along the bottom, boiling out of sync.
-      critters.forEach((sheet, i) => {
-        const f = sheet[boil(game, i * 0.7)]!;
-        const x = ((t * 18 + i * 60) % (game.width + 60)) - 30;
-        draw.sprite(f, Math.round(x), 174 - f.h);
+      const still = game.reducedMotion;
+      // Critters pop in one by one with a springy overshoot, then bob and squish out of step.
+      critters.forEach((name, i) => {
+        const pop = still ? 1 : ease.outBack(Math.min(1, Math.max(0, (t - i * 0.02) / 0.2)));
+        const bob = still ? 0 : Math.sin(t * 3 + i * 1.3);
+        const sq = bob * 0.07;
+        // Anchored at the feet, so they squash against the ground as they hop.
+        draw.sprite(shapes[name], 40 + i * 48, 170 - Math.max(0, bob) * 4, {
+          origin: [0.5, 1],
+          scaleX: S * pop * (1 + sq),
+          scaleY: S * pop * (1 - sq),
+          smooth: true,
+        });
       });
 
-      // Each letter of the name boils on its own, at 3x.
-      const name = "OVERBUFFED";
-      const w = text.font.measure(name).w * 3;
-      let x = Math.round(game.width / 2 - w / 2);
-      for (const [i, ch] of [...name].entries()) {
-        draw.push();
-        draw.translate(x, 34);
-        draw.scale(3);
-        text.draw(draw, ch, 0, 0, { color: C.buff }, i * 0.9);
-        draw.pop();
-        x += (text.font.measure(ch).w + 1) * 3;
-      }
+      bigText(draw, "overbuffed", game.width / 2, 28, 4, C.buff);
 
-      const bob = Math.round(Math.sin(t * 4) * 2);
-      draw.sprite(buff[boil(game)]!, game.width / 2 - 11, 78 + bob);
-      text.draw(draw, "survive the swarm", game.width / 2, 106, { color: C.text, align: "center" }, 1);
-      if (Math.floor(t * 2) % 2 === 0) text.draw(draw, "press space", game.width / 2, 122, { color: C.cyan, align: "center" }, 2);
+      const wob = still ? 0 : Math.sin(t * 4) * 0.06;
+      draw.sprite(shapes.buff, game.width / 2, 98, { origin: [0.5, 1], scaleX: S * 1.5 * (1 + wob), scaleY: S * 1.5 * (1 - wob), smooth: true });
+      draw.text("survive the swarm", game.width / 2, 106, { color: C.text, align: "center" });
+      if (still || Math.floor(t * 2) % 2 === 0) draw.text("press space", game.width / 2, 120, { color: C.buff, align: "center" });
       const best = save.get("best");
       if (best) {
         const s = `best ${Math.floor(best / 60)}:${String(best % 60).padStart(2, "0")}${save.get("wins") ? ` - ${save.get("wins")} wins` : ""}`;
-        text.draw(draw, s, game.width / 2, 138, { color: C.dim, align: "center" }, 3);
+        draw.text(s, game.width / 2, 134, { color: C.text, align: "center" });
       }
     },
     inspect() {
