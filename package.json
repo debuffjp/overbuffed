@@ -19,7 +19,7 @@
   "devDependencies": {
     "@debuffjp/cli": "^0.23.0",
     "@debuffjp/dev": "^0.23.0",
-    "keiko": "^0.5.0",
+    "keiko": "^0.6.0",
     "typescript": "^7.0.2"
   }
 }
